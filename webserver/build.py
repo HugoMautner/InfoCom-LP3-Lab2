@@ -12,10 +12,8 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = 'dljsaklqk24e21cjn!Ew@@dsa5'
 
-# change this so that you can connect to your redis server
-# ===============================================
-redis_server = redis.Redis("REDIS_SERVER", decode_responses=True, charset="unicode_escape")
-# ===============================================
+# Connect to redis server
+redis_server = redis.Redis("localhost", decode_responses=True, charset="unicode_escape")
 
 # Translate OSM coordinate (longitude, latitude) to SVG coordinates (x,y).
 # Input coords_osm is a tuple (longitude, latitude).
@@ -42,16 +40,32 @@ def map():
 
 @app.route('/get_drones', methods=['GET'])
 def get_drones():
-    #=============================================================================================================================================
-    # Get the information of all the drones from redis server and update the dictionary `drone_dict' to create the response 
-    # drone_dict should have the following format:
-    # e.g if there are two drones in the system with IDs: DRONE1 and DRONE2
-    # drone_dict = {'DRONE_1':{'longitude': drone1_logitude_svg, 'latitude': drone1_logitude_svg, 'status': drone1_status},
-    #               'DRONE_2': {'longitude': drone2_logitude_svg, 'latitude': drone2_logitude_svg, 'status': drone2_status}
-    #              }
-    # use function translate() to covert the coodirnates to svg coordinates
-    #=============================================================================================================================================
+    
+    #connect to redis server and retrieve drone information
+    drone_info_from_redis = redis_server.hgetall("drones")
+    
+    #create empty dict
     drone_dict = {}
+    
+    #Iterate through the drone information obtained from redis
+    for drone_id, drone_info in drone_info_from_redis.items():
+
+        # Decode the pickled data
+        decoded_info = pickle.loads(drone_info.encode())
+
+        #retrieve the latitutde, longitude and status
+        latitude = decoded_info['latitude']
+        longitude = decoded_info['longitude']
+        status = decoded_info['status']
+        
+        
+        #translate to svg
+        svg_longitude, svg_latitude = translate((float(longitude), float(latitude)))
+        
+        #update dict
+        drone_dict[drone_id] = {'longitude': svg_longitude, 'latitude': svg_latitude, 'status': status}
+        
+    
     return jsonify(drone_dict)
 
 if __name__ == "__main__":

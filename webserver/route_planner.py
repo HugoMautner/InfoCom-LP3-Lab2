@@ -11,10 +11,8 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 app.secret_key = 'dljsaklqk24e21cjn!Ew@@dsa5'
 
-# change this to connect to your redis server
-# ===============================================
-redis_server = redis.Redis("REDIS_SERVER", decode_responses=True, charset="unicode_escape")
-# ===============================================
+# Connect to your redis server
+redis_server = redis.Redis(host="localhost", port="6379", decode_responses=True, charset="unicode_escape")
 
 geolocator = Nominatim(user_agent="my_request")
 region = ", Lund, Skåne, Sweden"
@@ -26,11 +24,14 @@ def send_request(drone_url, coords):
 
 @app.route('/planner', methods=['POST'])
 def route_planner():
+
+    # Decode geolocations from request
     Addresses =  json.loads(request.data.decode())
     FromAddress = Addresses['faddr']
     ToAddress = Addresses['taddr']
     from_location = geolocator.geocode(FromAddress + region, timeout=None)
     to_location = geolocator.geocode(ToAddress + region, timeout=None)
+
     if from_location is None:
         message = 'Departure address not found, please input a correct address'
         return message
@@ -42,18 +43,28 @@ def route_planner():
         coords = {'from': (from_location.longitude, from_location.latitude),
                   'to': (to_location.longitude, to_location.latitude),
                   }
-        # ======================================================================
-        # Here you need to find a drone that is availale from the database. You need to check the status of the drone, there are two status, 'busy' or 'idle', only 'idle' drone is available and can be sent the coords to run delivery
-        # 1. Find avialable drone in the database (Hint: Check keys in RedisServer)
-        # if no drone is availble:
-        message = 'No available drone, try later'
-        # else:
-            # 2. Get the IP of available drone, 
-        DRONE_URL = 'http://' + DRONE_IP+':5000'
-            # 3. Send coords to the URL of available drone
-        message = 'Got address and sent request to the drone'
+        
+        # Find an available drone in the database
+        available_drone = None
+        for drone_id in redis_server.hkeys("drones"):
+            status = redis_server.hget("drones", drone_id)['status']
+            if status == 'idle':
+                available_drone = drone_id
+                break
+        
+        if available_drone is None:
+            message = 'No available drone, try later'
+        else:
+            # Get the IP address of the available drone
+            drone_info = redis_server.hget("drones", available_drone)
+            drone_ip = json.loads(drone_info)['ip']
+            DRONE_URL = 'http://' + drone_ip + ':5000'
+
+            # Send coordinates to the URL of available drone
+            send_request(DRONE_URL, coords)
+            message = 'Got address and sent request to the drone'
+
     return message
-        # ======================================================================
 
 
 if __name__ == "__main__":

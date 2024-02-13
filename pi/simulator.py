@@ -46,13 +46,16 @@ def run(id, current_coords, from_coords, to_coords, SERVER_URL):
                           'status': 'idle'
                          }
             resp = session.post(SERVER_URL, json=drone_info)
+
+    # Save final coordinates to a text file
+    with open('final_coordinates.txt', 'w') as file:
+        file.write(f"Longitude: {drone_coords[0]}, Latitude: {drone_coords[1]}")      
+    
     return drone_coords[0], drone_coords[1]
    
 if __name__ == "__main__":
-    # Fill in the IP address of server, in order to location of the drone to the SERVER
-    #===================================================================
-    SERVER_URL = "http://SERVER_IP:PORT/drone"
-    #===================================================================
+    # IP of the server, port to database
+    SERVER_URL = "http://192.168.0.1:5001/drone"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--clong", help='current longitude of drone location' ,type=float)
@@ -69,6 +72,5 @@ if __name__ == "__main__":
     to_coords = (args.tlong, args.tlat)
 
     print(current_coords, from_coords, to_coords)
-    drone_long, drone_lat = run(args.id ,current_coords, from_coords, to_coords, SERVER_URL)
-    # drone_long and drone_lat is the final location when drlivery is completed, find a way save the value, and use it for the initial coordinates of next delivery
-    #=============================================================================
+    drone_long, drone_lat = run(args.id, current_coords, from_coords, to_coords, SERVER_URL)
+    
